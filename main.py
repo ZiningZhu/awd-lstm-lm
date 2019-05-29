@@ -159,12 +159,13 @@ def evaluate(data_source, batch_size=10):
     if args.model == 'QRNN': model.reset()
     total_loss = 0
     ntokens = len(corpus.dictionary)
-    hidden = model.init_hidden(batch_size)
-    for i in range(0, data_source.size(0) - 1, args.bptt):
-        data, targets = get_batch(data_source, i, args, evaluation=True)
-        output, hidden = model(data, hidden)
-        total_loss += len(data) * criterion(model.decoder.weight, model.decoder.bias, output, targets).data
-        hidden = repackage_hidden(hidden)
+    with torch.no_grad():
+        hidden = model.init_hidden(batch_size)
+        for i in range(0, data_source.size(0) - 1, args.bptt):
+            data, targets = get_batch(data_source, i, args, evaluation=True)
+            output, hidden = model(data, hidden)
+            total_loss += len(data) * criterion(model.decoder.weight, model.decoder.bias, output, targets).data
+            hidden = repackage_hidden(hidden)
     return total_loss.item() / len(data_source)
 
 
@@ -244,21 +245,22 @@ try:
                 tmp[prm] = prm.data.clone()
                 if 'ax' in optimizer.state[prm]:
                     prm.data = optimizer.state[prm]['ax'].clone()
-
+            
             val_loss2 = evaluate(val_data)
             print('-' * 89)
             print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
                 'valid ppl {:8.2f} | valid bpc {:8.3f}'.format(
                     epoch, (time.time() - epoch_start_time), val_loss2, math.exp(val_loss2), val_loss2 / math.log(2)))
             print('-' * 89)
-
+            
             if val_loss2 < stored_loss:
                 model_save(args.save)
                 print('Saving Averaged!')
                 stored_loss = val_loss2
 
             for prm in model.parameters():
-                prm.data = tmp[prm].clone()
+                if prm in tmp:
+                    prm.data = tmp[prm].clone()
 
         else:
             val_loss = evaluate(val_data, eval_batch_size)
