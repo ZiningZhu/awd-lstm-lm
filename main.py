@@ -9,6 +9,8 @@ import data
 import model
 
 from utils import batchify, get_batch, repackage_hidden
+from fastai.utils.mem import GPUMemTrace
+mtrace = GPUMemTrace()
 
 parser = argparse.ArgumentParser(description='PyTorch PennTreeBank RNN/LSTM Language Model')
 parser.add_argument('--data', type=str, default='data/penn/',
@@ -100,7 +102,7 @@ else:
     corpus = data.Corpus(args.data)
     torch.save(corpus, fn)
 
-eval_batch_size = 10
+eval_batch_size = 1
 test_batch_size = 1
 train_data = batchify(corpus.train, args.batch_size, args)
 val_data = batchify(corpus.valid, eval_batch_size, args)
@@ -286,6 +288,9 @@ try:
                 optimizer.param_groups[0]['lr'] /= 10.
 
             best_val_loss.append(val_loss)
+
+        torch.cuda.empty_cache()
+        mtrace.report()
 
 except KeyboardInterrupt:
     print('-' * 89)
